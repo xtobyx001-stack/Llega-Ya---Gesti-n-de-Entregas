@@ -502,6 +502,104 @@ white-space: nowrap !important;
 from { opacity: 0; transform: translateY(14px); }
 to { opacity: 1; transform: translateY(0); }
 }
+
+/* MANUAL FORM */
+.btn-add-manual {
+display: flex !important;
+align-items: center !important;
+justify-content: center !important;
+gap: 8px !important;
+width: 100% !important;
+padding: 13px !important;
+background: linear-gradient(135deg, #1A2B5F, #2A3F8A) !important;
+color: #FFD320 !important;
+border: none !important;
+border-radius: 12px !important;
+font-family: ‘Nunito’, sans-serif !important;
+font-size: 14px !important;
+font-weight: 800 !important;
+text-transform: uppercase !important;
+letter-spacing: 0.5px !important;
+cursor: pointer !important;
+margin-bottom: 20px !important;
+}
+
+.manual-form {
+background: #FFFFFF !important;
+border-radius: 14px !important;
+padding: 20px !important;
+margin-bottom: 20px !important;
+box-shadow: 0 3px 14px rgba(26,43,95,0.09) !important;
+border: 1.5px solid #E0E4EF !important;
+display: none !important;
+}
+
+.manual-form.open { display: block !important; }
+
+.manual-form h3 {
+font-family: ‘Bebas Neue’, sans-serif !important;
+font-size: 18px !important;
+color: #1A2B5F !important;
+letter-spacing: 1px !important;
+margin-bottom: 14px !important;
+}
+
+.form-group { margin-bottom: 12px !important; }
+
+.form-group label {
+display: block !important;
+font-size: 11px !important;
+font-weight: 800 !important;
+color: #6B7280 !important;
+text-transform: uppercase !important;
+letter-spacing: 0.8px !important;
+margin-bottom: 5px !important;
+}
+
+.form-group input {
+width: 100% !important;
+padding: 11px 14px !important;
+border: 2px solid #E0E4EF !important;
+border-radius: 10px !important;
+font-family: ‘Nunito’, sans-serif !important;
+font-size: 14px !important;
+font-weight: 600 !important;
+color: #1A2B5F !important;
+background: #F2F4F8 !important;
+outline: none !important;
+}
+
+.form-group input:focus { border-color: #F5600A !important; background: #FFFFFF !important; }
+
+.form-actions { display: flex !important; gap: 10px !important; margin-top: 16px !important; }
+
+.btn-form-save {
+flex: 1 !important;
+padding: 12px !important;
+background: linear-gradient(135deg, #F5600A, #C94E06) !important;
+color: #FFFFFF !important;
+border: none !important;
+border-radius: 10px !important;
+font-family: ‘Nunito’, sans-serif !important;
+font-size: 13px !important;
+font-weight: 800 !important;
+text-transform: uppercase !important;
+cursor: pointer !important;
+}
+
+.btn-form-cancel {
+flex: 1 !important;
+padding: 12px !important;
+background: #F2F4F8 !important;
+color: #1A2B5F !important;
+border: 2px solid #E0E4EF !important;
+border-radius: 10px !important;
+font-family: ‘Nunito’, sans-serif !important;
+font-size: 13px !important;
+font-weight: 800 !important;
+text-transform: uppercase !important;
+cursor: pointer !important;
+}
 </style>
 
 <!-- HEADER -->
@@ -557,6 +655,28 @@ to { opacity: 1; transform: translateY(0); }
     </div>
 
 ```
+<button class="btn-add-manual" onclick="toggleManualForm()">➕ Agregar paquete manualmente</button>
+
+<div class="manual-form" id="manualForm">
+  <h3>📝 Nuevo Paquete</h3>
+  <div class="form-group">
+    <label>Nombre del receptor</label>
+    <input type="text" id="mName" placeholder="Ej: Julia Rosario" />
+  </div>
+  <div class="form-group">
+    <label>Teléfono</label>
+    <input type="tel" id="mPhone" placeholder="Ej: +18293686061" />
+  </div>
+  <div class="form-group">
+    <label>Número de orden</label>
+    <input type="text" id="mOrder" placeholder="Ej: 9801390" />
+  </div>
+  <div class="form-actions">
+    <button class="btn-form-cancel" onclick="toggleManualForm()">✗ Cancelar</button>
+    <button class="btn-form-save" onclick="saveManual()">✓ Guardar</button>
+  </div>
+</div>
+
 <div class="search-bar">
   <span class="search-icon">🔍</span>
   <input type="text" id="searchPaquetes" placeholder="Buscar por nombre, teléfono o número de orden..." oninput="renderPaquetes()"/>
@@ -982,6 +1102,58 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+
+function toggleManualForm() {
+  const form = document.getElementById('manualForm');
+  form.classList.toggle('open');
+  if (form.classList.contains('open')) {
+    document.getElementById('mName').focus();
+  } else {
+    document.getElementById('mName').value = '';
+    document.getElementById('mPhone').value = '';
+    document.getElementById('mOrder').value = '';
+  }
+}
+
+function saveManual() {
+  const name = document.getElementById('mName').value.trim();
+  const phone = document.getElementById('mPhone').value.trim();
+  const order = document.getElementById('mOrder').value.trim();
+
+  if (!name) { showToast('⚠️ Ingresa el nombre'); return; }
+  if (!phone) { showToast('⚠️ Ingresa el teléfono'); return; }
+  if (!order) { showToast('⚠️ Ingresa el número de orden'); return; }
+
+  const existingIds = new Set([
+    ...paquetes.map(p => p.id),
+    ...pendientes.map(p => p.id),
+    ...entregados.map(p => p.id)
+  ]);
+
+  if (existingIds.has(order)) {
+    showToast('⚠️ Ya existe un paquete con ese número de orden');
+    return;
+  }
+
+  paquetes.push({
+    id: order,
+    name: name,
+    phone: phone,
+    cod: '',
+    customer: '',
+    zone: '',
+    note: '',
+    status: 'paquete',
+    loadedAt: Date.now(),
+    manual: true
+  });
+
+  saveStorage();
+  renderAll();
+  toggleManualForm();
+  showToast('✅ Paquete agregado manualmente');
 }
 
 // ── INIT ──
