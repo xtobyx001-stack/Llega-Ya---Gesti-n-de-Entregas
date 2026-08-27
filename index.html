@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadre de Caja - Generador de Recibos</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
@@ -29,6 +29,8 @@ tailwind.config = {
   .btn-primary { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); transition: all 0.2s; }
   .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(37,99,235,0.3); }
   .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-success { background: linear-gradient(135deg, #059669 0%, #047857 100%); transition: all 0.2s; }
+  .btn-success:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(5,150,105,0.3); }
   .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
   .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(239,68,68,0.3); }
   .fade-in { animation: fadeIn 0.3s ease-out; }
@@ -36,7 +38,7 @@ tailwind.config = {
   @keyframes spin { to { transform: rotate(360deg); } }
   .spinner { animation: spin 1s linear infinite; }
   
-  /* Receipt styles - simplified for html2canvas compatibility */
+  /* Receipt styles */
   .receipt { background: white; color: #1f2937; font-family: 'Inter', sans-serif; }
   .receipt-header { background: #1d4ed8; color: white; }
   .receipt-table th { background: #f1f5f9; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
@@ -46,10 +48,35 @@ tailwind.config = {
   .balance-box { background: #059669; color: white; border-radius: 12px; padding: 20px; text-align: center; }
   .signature-line { border-top: 1.5px solid #374151; margin-top: 50px; padding-top: 8px; }
   
+  /* Print styles - CRITICAL for PDF generation */
   @media print {
-    body * { visibility: hidden; }
-    #receipt-output, #receipt-output * { visibility: visible; }
-    #receipt-output { position: absolute; left: 0; top: 0; width: 100%; }
+    @page {
+      size: A4;
+      margin: 10mm;
+    }
+    html, body {
+      background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    body * {
+      visibility: hidden !important;
+    }
+    #receipt-output,
+    #receipt-output * {
+      visibility: visible !important;
+    }
+    #receipt-output {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
+    .no-print { display: none !important; }
   }
   
   .scroll-area { max-height: 500px; overflow-y: auto; }
@@ -57,7 +84,7 @@ tailwind.config = {
   .scroll-area::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
   .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
   
-  /* Toast notification */
+  /* Toast */
   .toast {
     position: fixed;
     top: 20px;
@@ -73,10 +100,33 @@ tailwind.config = {
     display: flex;
     align-items: center;
     gap: 10px;
+    max-width: 400px;
   }
   .toast-success { background: #059669; }
   .toast-error { background: #dc2626; }
+  .toast-info { background: #2563eb; }
   @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+  }
+  .modal-box {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
 </style>
 </head>
 <body>
@@ -84,7 +134,7 @@ tailwind.config = {
 <div class="container mx-auto px-4 py-8 max-w-7xl">
   
   <!-- Header -->
-  <div class="text-center mb-8">
+  <div class="text-center mb-8 no-print">
     <div class="inline-flex items-center gap-3 mb-3">
       <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center shadow-lg">
         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +149,7 @@ tailwind.config = {
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     
     <!-- LEFT: Form -->
-    <div class="space-y-5">
+    <div class="space-y-5 no-print">
       
       <!-- Datos generales -->
       <div class="glass rounded-2xl p-6 shadow-lg">
@@ -129,7 +179,7 @@ tailwind.config = {
           <div class="grid grid-cols-12 gap-2">
             <input type="text" id="tDesc" placeholder="Descripción" class="col-span-6 input-field px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 text-sm">
             <input type="number" id="tMonto" step="0.01" placeholder="Monto" class="col-span-4 input-field px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 text-sm">
-            <button onclick="addTransferencia()" class="col-span-2 btn-primary text-white rounded-lg text-sm font-semibold">+ Agregar</button>
+            <button onclick="addTransferencia()" class="col-span-2 btn-primary text-white rounded-lg text-sm font-semibold">+</button>
           </div>
           <div id="transferenciasList" class="scroll-area space-y-2"></div>
           <div id="totalTransferencias" class="text-right font-bold text-amber-700 text-sm pt-2 border-t border-gray-200"></div>
@@ -145,7 +195,7 @@ tailwind.config = {
         <div class="grid grid-cols-12 gap-2">
           <input type="number" id="paqCantidad" placeholder="Cantidad" class="col-span-4 input-field px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 text-sm">
           <input type="number" id="paqPrecio" step="0.01" value="150" placeholder="Precio c/u" class="col-span-5 input-field px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 text-sm">
-          <button onclick="addPaquete()" class="col-span-3 btn-primary text-white rounded-lg text-sm font-semibold">+ Agregar</button>
+          <button onclick="addPaquete()" class="col-span-3 btn-primary text-white rounded-lg text-sm font-semibold">+</button>
         </div>
         <div id="paquetesList" class="scroll-area space-y-2 mt-3"></div>
         <div id="totalPaquetes" class="text-right font-bold text-emerald-700 text-sm pt-2 border-t border-gray-200"></div>
@@ -161,7 +211,7 @@ tailwind.config = {
         <div class="grid grid-cols-12 gap-2">
           <input type="text" id="rBeneficiario" placeholder="Beneficiario" class="col-span-5 input-field px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 text-sm">
           <input type="text" id="rCodigo" placeholder="Código" class="col-span-4 input-field px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 text-sm">
-          <button onclick="addRechazado()" class="col-span-3 btn-primary text-white rounded-lg text-sm font-semibold">+ Agregar</button>
+          <button onclick="addRechazado()" class="col-span-3 btn-primary text-white rounded-lg text-sm font-semibold">+</button>
         </div>
         <div id="rechazadosList" class="scroll-area space-y-2 mt-3"></div>
         <div id="totalRechazados" class="text-right font-bold text-red-700 text-sm pt-2 border-t border-gray-200"></div>
@@ -191,30 +241,38 @@ tailwind.config = {
 
       <!-- Acciones -->
       <div class="flex flex-wrap gap-3">
-        <button id="btnPDF" onclick="generarPDF()" class="flex-1 btn-primary text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-          <svg id="iconPDF" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          <span id="txtPDF">Descargar PDF</span>
+        <button onclick="descargarPDF()" class="flex-1 btn-success text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Descargar PDF
         </button>
-        <button onclick="window.print()" class="flex-1 bg-white border-2 border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 flex items-center justify-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-          Imprimir
+        <button onclick="descargarPDFhtml2pdf()" class="flex-1 btn-primary text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+          PDF (Alternativo)
         </button>
         <button onclick="limpiarTodo()" class="btn-danger text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
           Limpiar
         </button>
       </div>
+      
+      <!-- Ayuda -->
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm">
+        <div class="font-bold text-blue-900 mb-1 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          ¿Problemas para descargar?
+        </div>
+        <p class="text-blue-800 text-xs">Si el botón no funciona, use <strong>"PDF (Alternativo)"</strong> o en el diálogo de impresión seleccione <strong>"Guardar como PDF"</strong> como destino.</p>
+      </div>
     </div>
 
     <!-- RIGHT: Receipt Preview -->
     <div class="lg:sticky lg:top-6 lg:self-start">
-      <div class="glass rounded-2xl p-4 shadow-lg">
-        <div class="flex items-center justify-between mb-3 px-2">
+      <div class="glass rounded-2xl p-4 shadow-lg no-print-header">
+        <div class="flex items-center justify-between mb-3 px-2 no-print">
           <h2 class="text-lg font-bold text-gray-800">Vista Previa del Recibo</h2>
           <span class="text-xs bg-brand-100 text-brand-700 px-3 py-1 rounded-full font-semibold">Actualización en vivo</span>
         </div>
         <div id="receipt-output" class="receipt rounded-xl overflow-hidden shadow-md">
-          <!-- Receipt content rendered here -->
         </div>
       </div>
     </div>
@@ -231,22 +289,24 @@ let rechazados = [];
 // Init date
 document.getElementById('fechaCuadre').valueAsDate = new Date();
 
-// Toast notification
+// Toast
 function showToast(message, type = 'success') {
-  const existing = document.querySelector('.toast');
-  if (existing) existing.remove();
+  const existing = document.querySelectorAll('.toast');
+  existing.forEach(t => t.remove());
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  const icon = type === 'success' 
-    ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
-    : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
-  toast.innerHTML = icon + `<span>${message}</span>`;
+  const icons = {
+    success: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+    error: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+    info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+  };
+  toast.innerHTML = (icons[type] || icons.info) + `<span>${message}</span>`;
   document.body.appendChild(toast);
   setTimeout(() => {
     toast.style.transition = 'opacity 0.3s';
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  }, 4000);
 }
 
 // Format currency
@@ -254,51 +314,47 @@ function fmt(n) {
   return 'RD$ ' + Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Format date for display
+// Format date
 function fmtDate(d) {
   if (!d) return '';
   const date = new Date(d + 'T00:00:00');
   return date.toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-// Add transferencia
+// Add functions
 function addTransferencia() {
   const desc = document.getElementById('tDesc').value.trim();
   const monto = parseFloat(document.getElementById('tMonto').value);
-  if (!desc || !monto || monto <= 0) { alert('Complete descripción y monto válido'); return; }
+  if (!desc || !monto || monto <= 0) { showToast('Complete descripción y monto válido', 'error'); return; }
   transferencias.push({ desc, monto });
   document.getElementById('tDesc').value = '';
   document.getElementById('tMonto').value = '';
   renderAll();
 }
 
-// Add paquete
 function addPaquete() {
   const cant = parseInt(document.getElementById('paqCantidad').value);
   const precio = parseFloat(document.getElementById('paqPrecio').value);
-  if (!cant || cant <= 0 || !precio || precio <= 0) { alert('Complete cantidad y precio válidos'); return; }
+  if (!cant || cant <= 0 || !precio || precio <= 0) { showToast('Complete cantidad y precio válidos', 'error'); return; }
   paquetes.push({ cantidad: cant, precio, total: cant * precio });
   document.getElementById('paqCantidad').value = '';
   renderAll();
 }
 
-// Add rechazado
 function addRechazado() {
   const ben = document.getElementById('rBeneficiario').value.trim();
   const cod = document.getElementById('rCodigo').value.trim();
-  if (!ben || !cod) { alert('Complete beneficiario y código'); return; }
+  if (!ben || !cod) { showToast('Complete beneficiario y código', 'error'); return; }
   rechazados.push({ beneficiario: ben, codigo: cod });
   document.getElementById('rBeneficiario').value = '';
   document.getElementById('rCodigo').value = '';
   renderAll();
 }
 
-// Remove items
 function removeTransferencia(i) { transferencias.splice(i,1); renderAll(); }
 function removePaquete(i) { paquetes.splice(i,1); renderAll(); }
 function removeRechazado(i) { rechazados.splice(i,1); renderAll(); }
 
-// Clear all
 function limpiarTodo() {
   if (!confirm('¿Está seguro de limpiar todos los datos?')) return;
   transferencias = []; paquetes = []; rechazados = [];
@@ -307,11 +363,10 @@ function limpiarTodo() {
   renderAll();
 }
 
-// Render lists
+// Render
 function renderAll() {
   const precioPaq = parseFloat(document.getElementById('paqPrecio').value) || 150;
   
-  // Transferencias
   const tList = document.getElementById('transferenciasList');
   if (transferencias.length === 0) {
     tList.innerHTML = '<p class="text-xs text-gray-400 text-center py-3 italic">Sin transferencias agregadas</p>';
@@ -331,7 +386,6 @@ function renderAll() {
   const totalT = transferencias.reduce((s,t)=>s+t.monto,0);
   document.getElementById('totalTransferencias').textContent = transferencias.length ? `Total: ${fmt(totalT)}` : '';
 
-  // Paquetes
   const pList = document.getElementById('paquetesList');
   if (paquetes.length === 0) {
     pList.innerHTML = '<p class="text-xs text-gray-400 text-center py-3 italic">Sin paquetes agregados</p>';
@@ -352,7 +406,6 @@ function renderAll() {
   const totalCant = paquetes.reduce((s,p)=>s+p.cantidad,0);
   document.getElementById('totalPaquetes').textContent = paquetes.length ? `${totalCant} paquetes · Total: ${fmt(totalP)}` : '';
 
-  // Rechazados
   const rList = document.getElementById('rechazadosList');
   if (rechazados.length === 0) {
     rList.innerHTML = '<p class="text-xs text-gray-400 text-center py-3 italic">Sin paquetes rechazados</p>';
@@ -372,7 +425,6 @@ function renderAll() {
   const totalR = rechazados.length * precioPaq;
   document.getElementById('totalRechazados').textContent = rechazados.length ? `${rechazados.length} rechazados · Total: ${fmt(totalR)}` : '';
 
-  // Summary
   const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
   const egresos = totalT + totalP + totalR;
   const saldo = inicial - egresos;
@@ -386,7 +438,6 @@ function renderAll() {
   renderReceipt();
 }
 
-// Render receipt
 function renderReceipt() {
   const fecha = document.getElementById('fechaCuadre').value;
   const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
@@ -399,136 +450,136 @@ function renderReceipt() {
   const saldo = inicial - egresos;
 
   let html = `
-    <div class="receipt-header px-6 py-5">
-      <div class="flex items-center justify-between">
+    <div style="background:#1d4ed8;color:white;padding:20px 24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <div class="text-xs uppercase tracking-widest opacity-80">Reporte Oficial</div>
-          <div class="text-xl font-bold mt-1">Cuadre de Caja y Transferencias</div>
-          <div class="text-xs opacity-90 mt-1">Conciliación Bancaria</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;opacity:0.8;">Reporte Oficial</div>
+          <div style="font-size:20px;font-weight:bold;margin-top:4px;">Cuadre de Caja y Transferencias</div>
+          <div style="font-size:12px;opacity:0.9;margin-top:4px;">Conciliación Bancaria</div>
         </div>
-        <div class="text-right">
-          <div class="text-xs opacity-80">Fecha de Cuadre</div>
-          <div class="text-sm font-semibold mt-1">${fmtDate(fecha) || '—'}</div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;opacity:0.8;">Fecha de Cuadre</div>
+          <div style="font-size:14px;font-weight:600;margin-top:4px;">${fmtDate(fecha) || '—'}</div>
         </div>
       </div>
     </div>
 
-    <div class="p-6 space-y-5">
+    <div style="padding:24px;">
   `;
 
   // 1. Transferencias
   html += `
-    <div>
-      <div class="flex items-center gap-2 mb-2">
-        <div class="w-6 h-6 rounded-md bg-amber-500 text-white flex items-center justify-center text-xs font-bold">1</div>
-        <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wide">Detalle de Transferencias</h3>
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="width:24px;height:24px;border-radius:6px;background:#f59e0b;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">1</div>
+        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Detalle de Transferencias</h3>
       </div>
-      <div class="border border-gray-200 rounded-lg overflow-hidden">
-        <table class="receipt-table w-full text-sm">
-          <thead><tr><th class="text-left">Concepto</th><th class="text-right">Monto (RD$)</th></tr></thead>
+      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Concepto</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Monto (RD$)</th></tr></thead>
           <tbody>
   `;
   if (transferencias.length === 0) {
-    html += `<tr><td colspan="2" class="text-center text-gray-400 italic py-3">Sin transferencias</td></tr>`;
+    html += `<tr><td colspan="2" style="text-align:center;color:#9ca3af;font-style:italic;padding:12px;">Sin transferencias</td></tr>`;
   } else {
     transferencias.forEach(t => {
-      html += `<tr><td>${t.desc}</td><td class="text-right font-semibold">${fmt(t.monto)}</td></tr>`;
+      html += `<tr><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">${t.desc}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(t.monto)}</td></tr>`;
     });
-    html += `<tr class="receipt-total-row"><td>TOTAL</td><td class="text-right">${fmt(totalT)}</td></tr>`;
+    html += `<tr style="background:#dbeafe;font-weight:700;"><td style="padding:10px 14px;">TOTAL</td><td style="padding:10px 14px;text-align:right;">${fmt(totalT)}</td></tr>`;
   }
   html += `</tbody></table></div></div>`;
 
-  // 2. Paquetes entregados
+  // 2. Paquetes
   html += `
-    <div>
-      <div class="flex items-center gap-2 mb-2">
-        <div class="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">2</div>
-        <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wide">Paquetes Entregados</h3>
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="width:24px;height:24px;border-radius:6px;background:#059669;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">2</div>
+        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Paquetes Entregados</h3>
       </div>
-      <div class="border border-gray-200 rounded-lg overflow-hidden">
-        <table class="receipt-table w-full text-sm">
-          <thead><tr><th class="text-left">Concepto</th><th class="text-right">Cantidad</th><th class="text-right">Valor Total (RD$)</th></tr></thead>
+      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Concepto</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Cantidad</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Valor Total (RD$)</th></tr></thead>
           <tbody>
   `;
   if (paquetes.length === 0) {
-    html += `<tr><td colspan="3" class="text-center text-gray-400 italic py-3">Sin paquetes</td></tr>`;
+    html += `<tr><td colspan="3" style="text-align:center;color:#9ca3af;font-style:italic;padding:12px;">Sin paquetes</td></tr>`;
   } else {
     paquetes.forEach(p => {
-      html += `<tr><td>Paquetes entregados @ ${fmt(p.precio)} c/u</td><td class="text-right">${p.cantidad}</td><td class="text-right font-semibold">${fmt(p.total)}</td></tr>`;
+      html += `<tr><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">Paquetes entregados @ ${fmt(p.precio)} c/u</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;">${p.cantidad}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(p.total)}</td></tr>`;
     });
-    html += `<tr class="receipt-total-row"><td colspan="2">TOTAL (${totalCant} paquetes)</td><td class="text-right">${fmt(totalP)}</td></tr>`;
+    html += `<tr style="background:#dbeafe;font-weight:700;"><td colspan="2" style="padding:10px 14px;">TOTAL (${totalCant} paquetes)</td><td style="padding:10px 14px;text-align:right;">${fmt(totalP)}</td></tr>`;
   }
   html += `</tbody></table></div></div>`;
 
-  // 3. Paquetes rechazados
+  // 3. Rechazados
   html += `
-    <div>
-      <div class="flex items-center gap-2 mb-2">
-        <div class="w-6 h-6 rounded-md bg-red-500 text-white flex items-center justify-center text-xs font-bold">3</div>
-        <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wide">Paquetes Rechazados</h3>
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="width:24px;height:24px;border-radius:6px;background:#ef4444;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">3</div>
+        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Paquetes Rechazados</h3>
       </div>
-      <div class="border border-gray-200 rounded-lg overflow-hidden">
-        <table class="receipt-table w-full text-sm">
-          <thead><tr><th class="text-left">Beneficiario</th><th class="text-left">Código</th><th class="text-right">Valor (RD$)</th><th class="text-center">Estatus</th></tr></thead>
+      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Beneficiario</th><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Código</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Valor (RD$)</th><th style="text-align:center;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Estatus</th></tr></thead>
           <tbody>
   `;
   if (rechazados.length === 0) {
-    html += `<tr><td colspan="4" class="text-center text-gray-400 italic py-3">Sin paquetes rechazados</td></tr>`;
+    html += `<tr><td colspan="4" style="text-align:center;color:#9ca3af;font-style:italic;padding:12px;">Sin paquetes rechazados</td></tr>`;
   } else {
     rechazados.forEach(r => {
-      html += `<tr><td>${r.beneficiario}</td><td>${r.codigo}</td><td class="text-right font-semibold">${fmt(precioPaq)}</td><td class="text-center"><span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">Rechazado</span></td></tr>`;
+      html += `<tr><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">${r.beneficiario}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">${r.codigo}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(precioPaq)}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:center;"><span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">Rechazado</span></td></tr>`;
     });
-    html += `<tr class="receipt-total-row"><td colspan="2">TOTAL (${rechazados.length} rechazados × ${fmt(precioPaq)})</td><td colspan="2" class="text-right">${fmt(totalR)}</td></tr>`;
+    html += `<tr style="background:#dbeafe;font-weight:700;"><td colspan="2" style="padding:10px 14px;">TOTAL (${rechazados.length} rechazados × ${fmt(precioPaq)})</td><td colspan="2" style="padding:10px 14px;text-align:right;">${fmt(totalR)}</td></tr>`;
   }
   html += `</tbody></table></div></div>`;
 
   // 4. Resumen
   html += `
-    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;">
-      <div class="flex items-center gap-2 mb-3">
-        <div class="w-6 h-6 rounded-md bg-brand-700 text-white flex items-center justify-center text-xs font-bold">4</div>
-        <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wide">Resumen de Cálculos</h3>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="width:24px;height:24px;border-radius:6px;background:#1d4ed8;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">4</div>
+        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Resumen de Cálculos</h3>
       </div>
-      <div class="space-y-1.5 text-sm">
-        <div class="flex justify-between"><span class="text-gray-600">Total Inicial</span><span class="font-semibold">${fmt(inicial)}</span></div>
-        <div class="flex justify-between text-amber-700"><span>(-) Transferencias Realizadas</span><span class="font-semibold">${fmt(totalT)}</span></div>
-        <div class="flex justify-between text-emerald-700"><span>(-) Paquetes Entregados (${totalCant} × ${fmt(precioPaq)})</span><span class="font-semibold">${fmt(totalP)}</span></div>
-        <div class="flex justify-between text-red-700"><span>(-) Paquetes Rechazados (${rechazados.length} × ${fmt(precioPaq)})</span><span class="font-semibold">${fmt(totalR)}</span></div>
-        <div style="border-top:2px solid #d1d5db;padding-top:8px;margin-top:8px;" class="flex justify-between font-bold">
+      <div style="font-size:13px;">
+        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:#6b7280;">Total Inicial</span><span style="font-weight:600;">${fmt(inicial)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;color:#b45309;"><span>(-) Transferencias Realizadas</span><span style="font-weight:600;">${fmt(totalT)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;color:#047857;"><span>(-) Paquetes Entregados (${totalCant} × ${fmt(precioPaq)})</span><span style="font-weight:600;">${fmt(totalP)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;color:#b91c1c;"><span>(-) Paquetes Rechazados (${rechazados.length} × ${fmt(precioPaq)})</span><span style="font-weight:600;">${fmt(totalR)}</span></div>
+        <div style="border-top:2px solid #d1d5db;padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;font-weight:bold;">
           <span>TOTAL DE EGRESOS</span><span>${fmt(egresos)}</span>
         </div>
       </div>
-      <div class="balance-box mt-4">
-        <div class="text-xs uppercase tracking-widest opacity-90">Saldo Final</div>
-        <div class="text-3xl font-bold mt-1">${fmt(saldo)}</div>
+      <div style="background:#059669;color:white;border-radius:12px;padding:20px;text-align:center;margin-top:16px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;opacity:0.9;">Saldo Final</div>
+        <div style="font-size:30px;font-weight:bold;margin-top:4px;">${fmt(saldo)}</div>
       </div>
     </div>
   `;
 
   // Notas
   html += `
-    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;">
-      <div class="font-bold text-blue-900 text-sm mb-2">NOTAS IMPORTANTES:</div>
-      <ul class="space-y-1 text-xs text-blue-800">
-        <li>✓ Este cuadre ha sido conciliado y balanceado correctamente.</li>
-        <li>✓ Se incluyen ${rechazados.length} paquete(s) rechazado(s) pagado(s) según acuerdo.</li>
-        <li>✓ Todos los datos han sido verificados y confirmados.</li>
-        <li>✓ Documento preparado por: Departamento de Contabilidad.</li>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:20px;">
+      <div style="font-weight:bold;color:#1e3a8a;font-size:13px;margin-bottom:8px;">NOTAS IMPORTANTES:</div>
+      <ul style="font-size:12px;color:#1e40af;list-style:none;padding:0;margin:0;">
+        <li style="padding:2px 0;">✓ Este cuadre ha sido conciliado y balanceado correctamente.</li>
+        <li style="padding:2px 0;">✓ Se incluyen ${rechazados.length} paquete(s) rechazado(s) pagado(s) según acuerdo.</li>
+        <li style="padding:2px 0;">✓ Todos los datos han sido verificados y confirmados.</li>
+        <li style="padding:2px 0;">✓ Documento preparado por: Departamento de Contabilidad.</li>
       </ul>
     </div>
   `;
 
   // Firmas
   html += `
-    <div class="grid grid-cols-3 gap-4 pt-4">
-      <div class="text-center">
-        <div class="signature-line text-xs font-semibold text-gray-700">Contador</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding-top:16px;">
+      <div style="text-align:center;">
+        <div style="border-top:1.5px solid #374151;margin-top:50px;padding-top:8px;font-size:12px;font-weight:600;color:#374151;">Contador</div>
       </div>
-      <div class="text-center">
-        <div class="signature-line text-xs font-semibold text-gray-700">Gerente</div>
+      <div style="text-align:center;">
+        <div style="border-top:1.5px solid #374151;margin-top:50px;padding-top:8px;font-size:12px;font-weight:600;color:#374151;">Gerente</div>
       </div>
-      <div class="text-center">
-        <div class="signature-line text-xs font-semibold text-gray-700">Director Financiero</div>
+      <div style="text-align:center;">
+        <div style="border-top:1.5px solid #374151;margin-top:50px;padding-top:8px;font-size:12px;font-weight:600;color:#374151;">Director Financiero</div>
       </div>
     </div>
   `;
@@ -537,95 +588,77 @@ function renderReceipt() {
   document.getElementById('receipt-output').innerHTML = html;
 }
 
-// Generate PDF with robust error handling
-async function generarPDF() {
-  const btn = document.getElementById('btnPDF');
-  const txtPDF = document.getElementById('txtPDF');
-  const iconPDF = document.getElementById('iconPDF');
-  const element = document.getElementById('receipt-output');
-  
-  // Check if html2pdf is loaded
-  if (typeof html2pdf === 'undefined') {
-    showToast('Error: La librería PDF no se cargó. Recargue la página.', 'error');
-    return;
-  }
-  
-  // Validate data
+// ============================================
+// MÉTODO 1: window.print() - MÁS CONFIABLE
+// ============================================
+function descargarPDF() {
   const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
   if (inicial === 0) {
     showToast('Ingrese el Total Inicial antes de generar el PDF', 'error');
     return;
   }
   
-  // Loading state
-  btn.disabled = true;
-  iconPDF.innerHTML = '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>';
-  iconPDF.classList.add('spinner');
-  txtPDF.textContent = 'Generando...';
+  showToast('Abriendo diálogo de impresión... Seleccione "Guardar como PDF"', 'info');
+  
+  setTimeout(() => {
+    window.print();
+  }, 500);
+}
+
+// ============================================
+// MÉTODO 2: html2pdf.js - ALTERNATIVO
+// ============================================
+async function descargarPDFhtml2pdf() {
+  const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
+  if (inicial === 0) {
+    showToast('Ingrese el Total Inicial antes de generar el PDF', 'error');
+    return;
+  }
+  
+  // Verificar si html2pdf está disponible
+  if (typeof html2pdf === 'undefined') {
+    console.error('html2pdf no está disponible');
+    showToast('Librería PDF no cargada. Use "Descargar PDF" (método principal)', 'error');
+    return;
+  }
+  
+  const element = document.getElementById('receipt-output');
+  const fecha = document.getElementById('fechaCuadre').value || 'recibo';
   
   try {
-    // Clone the element to avoid modifying the visible one
-    const clone = element.cloneNode(true);
-    clone.style.width = '800px';
-    clone.style.position = 'absolute';
-    clone.style.left = '-9999px';
-    clone.style.top = '0';
-    clone.style.background = 'white';
-    document.body.appendChild(clone);
+    showToast('Generando PDF...', 'info');
     
-    const fecha = document.getElementById('fechaCuadre').value || 'recibo';
     const opt = {
-      margin: [10, 10, 10, 10],
+      margin: 0,
       filename: `cuadre_${fecha}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
+        scale: 2,
+        useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        letterRendering: true
+        windowWidth: 800
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait' 
+      }
     };
     
-    await html2pdf().set(opt).from(clone).save();
-    document.body.removeChild(clone);
-    
-    showToast('PDF generado y descargado correctamente', 'success');
+    await html2pdf().set(opt).from(element).save();
+    showToast('PDF descargado correctamente', 'success');
   } catch (error) {
-    console.error('Error generando PDF:', error);
-    showToast('Error al generar el PDF: ' + error.message, 'error');
-    // Fallback: try with the original element
-    try {
-      const fecha = document.getElementById('fechaCuadre').value || 'recibo';
-      await html2pdf().set({
-        margin: 10,
-        filename: `cuadre_${fecha}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(element).save();
-      showToast('PDF generado (método alternativo)', 'success');
-    } catch (e2) {
-      console.error('Fallback también falló:', e2);
-      showToast('No se pudo generar el PDF. Intente con "Imprimir" y guardar como PDF.', 'error');
-    }
-  } finally {
-    // Reset button
-    btn.disabled = false;
-    iconPDF.classList.remove('spinner');
-    iconPDF.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>';
-    txtPDF.textContent = 'Descargar PDF';
+    console.error('Error html2pdf:', error);
+    showToast('Error con método alternativo. Use "Descargar PDF" principal', 'error');
   }
 }
 
-// Live update on input change
+// Event listeners
 document.getElementById('totalInicial').addEventListener('input', renderAll);
 document.getElementById('fechaCuadre').addEventListener('input', renderAll);
 document.getElementById('paqPrecio').addEventListener('input', renderAll);
 
-// Enter key support
 document.getElementById('tMonto').addEventListener('keypress', e => { if (e.key==='Enter') addTransferencia(); });
 document.getElementById('paqCantidad').addEventListener('keypress', e => { if (e.key==='Enter') addPaquete(); });
 document.getElementById('rCodigo').addEventListener('keypress', e => { if (e.key==='Enter') addRechazado(); });
@@ -633,15 +666,15 @@ document.getElementById('rCodigo').addEventListener('keypress', e => { if (e.key
 // Initial render
 renderAll();
 
-// Verify html2pdf loaded
+// Check library load
 window.addEventListener('load', () => {
   setTimeout(() => {
-    if (typeof html2pdf === 'undefined') {
-      console.warn('html2pdf no se cargó correctamente');
+    if (typeof html2pdf !== 'undefined') {
+      console.log('✓ html2pdf cargado correctamente');
     } else {
-      console.log('html2pdf cargado correctamente');
+      console.warn('⚠ html2pdf no se cargó - use el botón principal "Descargar PDF"');
     }
-  }, 1000);
+  }, 1500);
 });
 </script>
 
