@@ -38,6 +38,7 @@ tailwind.config = {
   @keyframes fadeIn { from { opacity:0; transform:translateY(-5px);} to { opacity:1; transform:translateY(0);} }
   @keyframes spin { to { transform: rotate(360deg); } }
   .spinner { animation: spin 1s linear infinite; }
+  @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
   
   .receipt { background: white; color: #1f2937; font-family: 'Inter', sans-serif; }
   .scroll-area { max-height: 500px; overflow-y: auto; }
@@ -48,28 +49,50 @@ tailwind.config = {
   .toast {
     position: fixed;
     top: 20px;
-    right: 20px;
-    left: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     padding: 14px 20px;
     border-radius: 12px;
     color: white;
     font-weight: 600;
     font-size: 14px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    z-index: 9999;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    z-index: 99999;
     animation: slideIn 0.3s ease-out;
     display: flex;
     align-items: center;
     gap: 10px;
-    max-width: 400px;
-    margin: 0 auto;
+    max-width: 90%;
   }
   .toast-success { background: #059669; }
   .toast-error { background: #dc2626; }
   .toast-info { background: #2563eb; }
-  @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes slideIn { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
 
-  /* Hidden PDF container - offscreen but renderable */
+  /* Modal overlay */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.2s ease-out;
+  }
+  .modal-box {
+    background: white;
+    border-radius: 20px;
+    padding: 28px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+    animation: modalPop 0.3s ease-out;
+  }
+  @keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
   #pdf-container {
     position: fixed;
     left: -9999px;
@@ -184,7 +207,7 @@ tailwind.config = {
       </div>
 
       <div class="flex flex-wrap gap-3">
-        <button id="btnPDF" onclick="generarPDF()" class="flex-1 btn-success text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 min-h-[52px]">
+        <button id="btnPDF" onclick="abrirModalNombre()" class="flex-1 btn-success text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 min-h-[52px]">
           <svg id="iconPDF" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
           <span id="txtPDF">Descargar PDF</span>
         </button>
@@ -197,9 +220,9 @@ tailwind.config = {
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm">
         <div class="font-bold text-blue-900 mb-1 flex items-center gap-2">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Información
+          ¿Cómo guardar el PDF?
         </div>
-        <p class="text-blue-800 text-xs">El PDF se generará y descargará automáticamente. En iOS Safari, revise la carpeta de <strong>Descargas</strong> o el botón de compartir.</p>
+        <p class="text-blue-800 text-xs">Al presionar <strong>"Guardar PDF"</strong>, se abrirá el menú de compartir de su dispositivo. Seleccione <strong>"Guardar en Archivos"</strong> y podrá elegir el nombre y la ubicación.</p>
       </div>
     </div>
 
@@ -216,7 +239,42 @@ tailwind.config = {
   </div>
 </div>
 
-<!-- Hidden container for PDF rendering -->
+<!-- Modal para nombre del archivo -->
+<div id="modalNombre" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+        <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      </div>
+      <div>
+        <h3 class="font-bold text-gray-800 text-lg">Guardar PDF</h3>
+        <p class="text-xs text-gray-500">Escriba el nombre del archivo</p>
+      </div>
+    </div>
+    
+    <div class="mb-4">
+      <label class="block text-sm font-semibold text-gray-700 mb-2">Nombre del archivo</label>
+      <div class="flex items-center gap-2">
+        <input type="text" id="nombreArchivo" class="input-field flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 text-sm font-medium" placeholder="ej: cuadre_agosto_2026">
+        <span class="text-sm font-semibold text-gray-500">.pdf</span>
+      </div>
+    </div>
+
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-800">
+      <strong>📱 En iPhone/iPad:</strong> Se abrirá el menú de compartir. Toque <strong>"Guardar en Archivos"</strong> para elegir dónde guardarlo.
+    </div>
+
+    <div class="flex gap-2">
+      <button onclick="cerrarModal()" class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50">Cancelar</button>
+      <button onclick="confirmarYGenerar()" id="btnConfirmar" class="flex-1 btn-success text-white px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Guardar PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Contenedor oculto para renderizar PDF -->
 <div id="pdf-container"></div>
 
 <script>
@@ -399,7 +457,6 @@ function renderReceipt() {
     <div style="padding:16px 20px;">
   `;
 
-  // 1. Transferencias
   html += `
     <div style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
@@ -421,7 +478,6 @@ function renderReceipt() {
   }
   html += `</tbody></table></div></div>`;
 
-  // 2. Paquetes
   html += `
     <div style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
@@ -443,7 +499,6 @@ function renderReceipt() {
   }
   html += `</tbody></table></div></div>`;
 
-  // 3. Rechazados
   html += `
     <div style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
@@ -465,7 +520,6 @@ function renderReceipt() {
   }
   html += `</tbody></table></div></div>`;
 
-  // 4. Resumen
   html += `
     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
@@ -488,7 +542,6 @@ function renderReceipt() {
     </div>
   `;
 
-  // Notas
   html += `
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:14px;">
       <div style="font-weight:bold;color:#1e3a8a;font-size:12px;margin-bottom:6px;">NOTAS IMPORTANTES:</div>
@@ -501,7 +554,6 @@ function renderReceipt() {
     </div>
   `;
 
-  // Firmas
   html += `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding-top:12px;">
       <div style="text-align:center;">
@@ -521,45 +573,73 @@ function renderReceipt() {
 }
 
 // ============================================
-// GENERACIÓN DE PDF CON jsPDF + html2canvas
+// MODAL PARA NOMBRE DEL ARCHIVO
 // ============================================
-async function generarPDF() {
+function abrirModalNombre() {
   const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
   if (inicial === 0) {
     showToast('Ingrese el Total Inicial antes de generar el PDF', 'error');
     return;
   }
+  
+  // Sugerir nombre basado en la fecha
+  const fecha = document.getElementById('fechaCuadre').value;
+  const nombreSugerido = fecha ? `cuadre_${fecha}` : 'cuadre_recibo';
+  document.getElementById('nombreArchivo').value = nombreSugerido;
+  
+  document.getElementById('modalNombre').style.display = 'flex';
+  setTimeout(() => {
+    const input = document.getElementById('nombreArchivo');
+    input.focus();
+    input.select();
+  }, 100);
+}
 
+function cerrarModal() {
+  document.getElementById('modalNombre').style.display = 'none';
+}
+
+async function confirmarYGenerar() {
+  let nombre = document.getElementById('nombreArchivo').value.trim();
+  if (!nombre) {
+    showToast('Escriba un nombre para el archivo', 'error');
+    return;
+  }
+  // Limpiar nombre (quitar caracteres inválidos)
+  nombre = nombre.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s_-]/g, '').replace(/\s+/g, '_');
+  if (!nombre.endsWith('.pdf')) nombre += '.pdf';
+  
+  cerrarModal();
+  await generarPDF(nombre);
+}
+
+// ============================================
+// GENERACIÓN DE PDF
+// ============================================
+async function generarPDF(nombreArchivo) {
   const btn = document.getElementById('btnPDF');
   const txtPDF = document.getElementById('txtPDF');
   const iconPDF = document.getElementById('iconPDF');
 
-  // Verificar librerías
   if (typeof window.jspdf === 'undefined' || typeof window.html2canvas === 'undefined') {
     showToast('Error: Librerías no cargadas. Recargue la página.', 'error');
     return;
   }
 
-  // Estado de carga
   btn.disabled = true;
-  iconSVG = iconPDF.innerHTML;
   iconPDF.innerHTML = '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>';
   iconPDF.classList.add('spinner');
   txtPDF.textContent = 'Generando...';
 
   try {
-    const fecha = document.getElementById('fechaCuadre').value || 'recibo';
     const container = document.getElementById('pdf-container');
     const receiptHTML = document.getElementById('receipt-output').innerHTML;
     
-    // Renderizar en contenedor oculto con ancho fijo
     container.innerHTML = `<div style="width:800px;background:white;">${receiptHTML}</div>`;
     const renderTarget = container.firstElementChild;
     
-    // Esperar un momento para que el DOM se actualice
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 150));
     
-    // Capturar como canvas
     const canvas = await html2canvas(renderTarget, {
       scale: 2,
       useCORS: true,
@@ -569,16 +649,10 @@ async function generarPDF() {
       windowWidth: 800
     });
     
-    // Limpiar contenedor
     container.innerHTML = '';
     
-    // Crear PDF con jsPDF
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -586,73 +660,99 @@ async function generarPDF() {
     const imgWidth = canvas.width;
     const imgHeight = canvas.height;
     
-    // Calcular proporciones
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-    const imgX = (pdfWidth - imgWidth * ratio) / 2;
-    const imgY = 10;
+    const ratio = Math.min((pdfWidth - 10) / imgWidth, (pdfHeight - 10) / imgHeight);
     const finalWidth = imgWidth * ratio;
     const finalHeight = imgHeight * ratio;
+    const imgX = (pdfWidth - finalWidth) / 2;
     
-    // Si el contenido es más alto que una página, agregar páginas
-    if (finalHeight > pdfHeight - 20) {
+    if (finalHeight > pdfHeight - 10) {
       let heightLeft = finalHeight;
       let position = 0;
       let page = 0;
-      
       while (heightLeft > 0) {
         if (page > 0) pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', imgX, imgY - position, finalWidth, finalHeight);
-        heightLeft -= (pdfHeight - 20);
-        position += (pdfHeight - 20);
+        pdf.addImage(imgData, 'JPEG', imgX, 5 - position, finalWidth, finalHeight);
+        heightLeft -= (pdfHeight - 10);
+        position += (pdfHeight - 10);
         page++;
       }
     } else {
-      pdf.addImage(imgData, 'JPEG', imgX, imgY, finalWidth, finalHeight);
+      pdf.addImage(imgData, 'JPEG', imgX, 5, finalWidth, finalHeight);
     }
     
-    // Generar blob y descargar
     const pdfBlob = pdf.output('blob');
-    const pdfUrl = URL.createObjectURL(pdfBlob);
     
-    // Detectar iOS
+    // MÉTODO PRINCIPAL: Web Share API (funciona en iOS Safari)
+    if (navigator.share && navigator.canShare) {
+      const pdfFile = new File([pdfBlob], nombreArchivo, { type: 'application/pdf' });
+      const shareData = { files: [pdfFile] };
+      
+      if (navigator.canShare(shareData)) {
+        try {
+          await navigator.share(shareData);
+          showToast('PDF compartido/guardado correctamente', 'success');
+          resetBtn();
+          return;
+        } catch (shareError) {
+          if (shareError.name === 'AbortError') {
+            showToast('Operación cancelada', 'info');
+            resetBtn();
+            return;
+          }
+          console.warn('Share falló, usando fallback:', shareError);
+        }
+      }
+    }
+    
+    // FALLBACK 1: Descarga directa (Android/Desktop)
+    const pdfUrl = URL.createObjectURL(pdfBlob);
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
     if (isIOS) {
-      // En iOS, abrir en nueva pestaña (el usuario puede compartir/guardar)
+      // En iOS, abrir en nueva pestaña para que el usuario pueda guardar
       const newWindow = window.open(pdfUrl, '_blank');
-      if (!newWindow) {
-        // Si el popup fue bloqueado, usar enlace
+      if (newWindow) {
+        showToast('PDF abierto. Mantenga presionado para guardar.', 'info');
+      } else {
+        // Si el popup fue bloqueado
         const link = document.createElement('a');
         link.href = pdfUrl;
-        link.download = `cuadre_${fecha}.pdf`;
+        link.download = nombreArchivo;
         link.target = '_blank';
+        link.rel = 'noopener';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        showToast('PDF generado. Revise sus descargas.', 'success');
       }
-      showToast('PDF generado. Guárdelo desde la vista previa.', 'success');
     } else {
-      // En desktop/Android, descargar directamente
       const link = document.createElement('a');
       link.href = pdfUrl;
-      link.download = `cuadre_${fecha}.pdf`;
+      link.download = nombreArchivo;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
-      showToast('PDF descargado correctamente', 'success');
+      showToast('PDF descargado: ' + nombreArchivo, 'success');
     }
     
   } catch (error) {
     console.error('Error generando PDF:', error);
     showToast('Error: ' + error.message, 'error');
   } finally {
-    btn.disabled = false;
-    iconPDF.classList.remove('spinner');
-    iconPDF.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>';
-    txtPDF.textContent = 'Descargar PDF';
+    resetBtn();
   }
+}
+
+function resetBtn() {
+  const btn = document.getElementById('btnPDF');
+  const txtPDF = document.getElementById('txtPDF');
+  const iconPDF = document.getElementById('iconPDF');
+  btn.disabled = false;
+  iconPDF.classList.remove('spinner');
+  iconPDF.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>';
+  txtPDF.textContent = 'Descargar PDF';
 }
 
 // Event listeners
@@ -663,14 +763,15 @@ document.getElementById('paqPrecio').addEventListener('input', renderAll);
 document.getElementById('tMonto').addEventListener('keypress', e => { if (e.key==='Enter') addTransferencia(); });
 document.getElementById('paqCantidad').addEventListener('keypress', e => { if (e.key==='Enter') addPaquete(); });
 document.getElementById('rCodigo').addEventListener('keypress', e => { if (e.key==='Enter') addRechazado(); });
+document.getElementById('nombreArchivo').addEventListener('keypress', e => { if (e.key==='Enter') confirmarYGenerar(); });
 
 renderAll();
 
-// Verificar librerías
 window.addEventListener('load', () => {
   setTimeout(() => {
     console.log('jsPDF:', typeof window.jspdf !== 'undefined' ? '✓' : '✗');
-    console.log('html2canvas:', typeof window.html2canvas !== 'undefined' ? '✓' : '✗');
+    console.log('html2canvas:', typeof window.html2canvas !== 'undefined' ? '✓' : '');
+    console.log('navigator.share:', typeof navigator.share !== 'undefined' ? '✓' : '✗');
   }, 1500);
 });
 </script>
