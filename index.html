@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadre de Caja - Generador de Recibos</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
@@ -15,8 +15,7 @@ tailwind.config = {
     extend: {
       fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
       colors: {
-        brand: { 50:'#eff6ff',100:'#dbeafe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
-        emerald: { 50:'#ecfdf5',500:'#10b981',600:'#059669',700:'#047857' }
+        brand: { 50:'#eff6ff',100:'#dbeafe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' }
       }
     }
   }
@@ -24,24 +23,27 @@ tailwind.config = {
 </script>
 <style>
   body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%); min-height: 100vh; }
-  .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.6); }
+  .glass { background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.6); }
   .input-field { transition: all 0.2s; }
   .input-field:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
   .btn-primary { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); transition: all 0.2s; }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(37,99,235,0.3); }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(37,99,235,0.3); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
   .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
   .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(239,68,68,0.3); }
   .fade-in { animation: fadeIn 0.3s ease-out; }
   @keyframes fadeIn { from { opacity:0; transform:translateY(-5px);} to { opacity:1; transform:translateY(0);} }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { animation: spin 1s linear infinite; }
   
-  /* Receipt styles */
+  /* Receipt styles - simplified for html2canvas compatibility */
   .receipt { background: white; color: #1f2937; font-family: 'Inter', sans-serif; }
-  .receipt-header { background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%); color: white; }
+  .receipt-header { background: #1d4ed8; color: white; }
   .receipt-table th { background: #f1f5f9; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
   .receipt-table td, .receipt-table th { padding: 10px 14px; border-bottom: 1px solid #e5e7eb; }
   .receipt-table tr:last-child td { border-bottom: none; }
-  .receipt-total-row { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); font-weight: 700; }
-  .balance-box { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border-radius: 12px; padding: 20px; text-align: center; }
+  .receipt-total-row { background: #dbeafe; font-weight: 700; }
+  .balance-box { background: #059669; color: white; border-radius: 12px; padding: 20px; text-align: center; }
   .signature-line { border-top: 1.5px solid #374151; margin-top: 50px; padding-top: 8px; }
   
   @media print {
@@ -54,6 +56,27 @@ tailwind.config = {
   .scroll-area::-webkit-scrollbar { width: 6px; }
   .scroll-area::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
   .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 14px 20px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    z-index: 9999;
+    animation: slideIn 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toast-success { background: #059669; }
+  .toast-error { background: #dc2626; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 </style>
 </head>
 <body>
@@ -168,9 +191,9 @@ tailwind.config = {
 
       <!-- Acciones -->
       <div class="flex flex-wrap gap-3">
-        <button onclick="generarPDF()" class="flex-1 btn-primary text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Descargar PDF
+        <button id="btnPDF" onclick="generarPDF()" class="flex-1 btn-primary text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+          <svg id="iconPDF" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <span id="txtPDF">Descargar PDF</span>
         </button>
         <button onclick="window.print()" class="flex-1 bg-white border-2 border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 flex items-center justify-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -207,6 +230,24 @@ let rechazados = [];
 
 // Init date
 document.getElementById('fechaCuadre').valueAsDate = new Date();
+
+// Toast notification
+function showToast(message, type = 'success') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  const icon = type === 'success' 
+    ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+    : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+  toast.innerHTML = icon + `<span>${message}</span>`;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'opacity 0.3s';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
 
 // Format currency
 function fmt(n) {
@@ -435,7 +476,7 @@ function renderReceipt() {
     html += `<tr><td colspan="4" class="text-center text-gray-400 italic py-3">Sin paquetes rechazados</td></tr>`;
   } else {
     rechazados.forEach(r => {
-      html += `<tr><td>${r.beneficiario}</td><td>${r.codigo}</td><td class="text-right font-semibold">${fmt(precioPaq)}</td><td class="text-center"><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-semibold">Rechazado</span></td></tr>`;
+      html += `<tr><td>${r.beneficiario}</td><td>${r.codigo}</td><td class="text-right font-semibold">${fmt(precioPaq)}</td><td class="text-center"><span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">Rechazado</span></td></tr>`;
     });
     html += `<tr class="receipt-total-row"><td colspan="2">TOTAL (${rechazados.length} rechazados × ${fmt(precioPaq)})</td><td colspan="2" class="text-right">${fmt(totalR)}</td></tr>`;
   }
@@ -443,7 +484,7 @@ function renderReceipt() {
 
   // 4. Resumen
   html += `
-    <div class="bg-gray-50 rounded-xl p-5 border border-gray-200">
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;">
       <div class="flex items-center gap-2 mb-3">
         <div class="w-6 h-6 rounded-md bg-brand-700 text-white flex items-center justify-center text-xs font-bold">4</div>
         <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wide">Resumen de Cálculos</h3>
@@ -453,7 +494,7 @@ function renderReceipt() {
         <div class="flex justify-between text-amber-700"><span>(-) Transferencias Realizadas</span><span class="font-semibold">${fmt(totalT)}</span></div>
         <div class="flex justify-between text-emerald-700"><span>(-) Paquetes Entregados (${totalCant} × ${fmt(precioPaq)})</span><span class="font-semibold">${fmt(totalP)}</span></div>
         <div class="flex justify-between text-red-700"><span>(-) Paquetes Rechazados (${rechazados.length} × ${fmt(precioPaq)})</span><span class="font-semibold">${fmt(totalR)}</span></div>
-        <div class="border-t-2 border-gray-300 pt-2 mt-2 flex justify-between font-bold">
+        <div style="border-top:2px solid #d1d5db;padding-top:8px;margin-top:8px;" class="flex justify-between font-bold">
           <span>TOTAL DE EGRESOS</span><span>${fmt(egresos)}</span>
         </div>
       </div>
@@ -466,7 +507,7 @@ function renderReceipt() {
 
   // Notas
   html += `
-    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;">
       <div class="font-bold text-blue-900 text-sm mb-2">NOTAS IMPORTANTES:</div>
       <ul class="space-y-1 text-xs text-blue-800">
         <li>✓ Este cuadre ha sido conciliado y balanceado correctamente.</li>
@@ -496,17 +537,87 @@ function renderReceipt() {
   document.getElementById('receipt-output').innerHTML = html;
 }
 
-// Generate PDF
-function generarPDF() {
+// Generate PDF with robust error handling
+async function generarPDF() {
+  const btn = document.getElementById('btnPDF');
+  const txtPDF = document.getElementById('txtPDF');
+  const iconPDF = document.getElementById('iconPDF');
   const element = document.getElementById('receipt-output');
-  const opt = {
-    margin: 0,
-    filename: `cuadre_${document.getElementById('fechaCuadre').value || 'recibo'}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-  html2pdf().set(opt).from(element).save();
+  
+  // Check if html2pdf is loaded
+  if (typeof html2pdf === 'undefined') {
+    showToast('Error: La librería PDF no se cargó. Recargue la página.', 'error');
+    return;
+  }
+  
+  // Validate data
+  const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
+  if (inicial === 0) {
+    showToast('Ingrese el Total Inicial antes de generar el PDF', 'error');
+    return;
+  }
+  
+  // Loading state
+  btn.disabled = true;
+  iconPDF.innerHTML = '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>';
+  iconPDF.classList.add('spinner');
+  txtPDF.textContent = 'Generando...';
+  
+  try {
+    // Clone the element to avoid modifying the visible one
+    const clone = element.cloneNode(true);
+    clone.style.width = '800px';
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '0';
+    clone.style.background = 'white';
+    document.body.appendChild(clone);
+    
+    const fecha = document.getElementById('fechaCuadre').value || 'recibo';
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: `cuadre_${fecha}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        backgroundColor: '#ffffff',
+        letterRendering: true
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+    
+    await html2pdf().set(opt).from(clone).save();
+    document.body.removeChild(clone);
+    
+    showToast('PDF generado y descargado correctamente', 'success');
+  } catch (error) {
+    console.error('Error generando PDF:', error);
+    showToast('Error al generar el PDF: ' + error.message, 'error');
+    // Fallback: try with the original element
+    try {
+      const fecha = document.getElementById('fechaCuadre').value || 'recibo';
+      await html2pdf().set({
+        margin: 10,
+        filename: `cuadre_${fecha}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(element).save();
+      showToast('PDF generado (método alternativo)', 'success');
+    } catch (e2) {
+      console.error('Fallback también falló:', e2);
+      showToast('No se pudo generar el PDF. Intente con "Imprimir" y guardar como PDF.', 'error');
+    }
+  } finally {
+    // Reset button
+    btn.disabled = false;
+    iconPDF.classList.remove('spinner');
+    iconPDF.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>';
+    txtPDF.textContent = 'Descargar PDF';
+  }
 }
 
 // Live update on input change
@@ -521,6 +632,17 @@ document.getElementById('rCodigo').addEventListener('keypress', e => { if (e.key
 
 // Initial render
 renderAll();
+
+// Verify html2pdf loaded
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    if (typeof html2pdf === 'undefined') {
+      console.warn('html2pdf no se cargó correctamente');
+    } else {
+      console.log('html2pdf cargado correctamente');
+    }
+  }, 1000);
+});
 </script>
 
 </body>
