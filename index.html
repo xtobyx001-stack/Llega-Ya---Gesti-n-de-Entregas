@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadre de Caja - Generador de Recibos</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
@@ -38,57 +39,17 @@ tailwind.config = {
   @keyframes spin { to { transform: rotate(360deg); } }
   .spinner { animation: spin 1s linear infinite; }
   
-  /* Receipt styles */
   .receipt { background: white; color: #1f2937; font-family: 'Inter', sans-serif; }
-  .receipt-header { background: #1d4ed8; color: white; }
-  .receipt-table th { background: #f1f5f9; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
-  .receipt-table td, .receipt-table th { padding: 10px 14px; border-bottom: 1px solid #e5e7eb; }
-  .receipt-table tr:last-child td { border-bottom: none; }
-  .receipt-total-row { background: #dbeafe; font-weight: 700; }
-  .balance-box { background: #059669; color: white; border-radius: 12px; padding: 20px; text-align: center; }
-  .signature-line { border-top: 1.5px solid #374151; margin-top: 50px; padding-top: 8px; }
-  
-  /* Print styles - CRITICAL for PDF generation */
-  @media print {
-    @page {
-      size: A4;
-      margin: 10mm;
-    }
-    html, body {
-      background: white !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-    body * {
-      visibility: hidden !important;
-    }
-    #receipt-output,
-    #receipt-output * {
-      visibility: visible !important;
-    }
-    #receipt-output {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 100% !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      box-shadow: none !important;
-      border-radius: 0 !important;
-    }
-    .no-print { display: none !important; }
-  }
-  
   .scroll-area { max-height: 500px; overflow-y: auto; }
   .scroll-area::-webkit-scrollbar { width: 6px; }
   .scroll-area::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
   .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
   
-  /* Toast */
   .toast {
     position: fixed;
     top: 20px;
     right: 20px;
+    left: 20px;
     padding: 14px 20px;
     border-radius: 12px;
     color: white;
@@ -101,31 +62,21 @@ tailwind.config = {
     align-items: center;
     gap: 10px;
     max-width: 400px;
+    margin: 0 auto;
   }
   .toast-success { background: #059669; }
   .toast-error { background: #dc2626; }
   .toast-info { background: #2563eb; }
-  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-  
-  /* Modal */
-  .modal-overlay {
+  @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* Hidden PDF container - offscreen but renderable */
+  #pdf-container {
     position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
-    z-index: 9998;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.2s ease-out;
-  }
-  .modal-box {
+    left: -9999px;
+    top: 0;
+    width: 800px;
     background: white;
-    border-radius: 16px;
-    padding: 24px;
-    max-width: 480px;
-    width: 90%;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    z-index: -1;
   }
 </style>
 </head>
@@ -133,8 +84,7 @@ tailwind.config = {
 
 <div class="container mx-auto px-4 py-8 max-w-7xl">
   
-  <!-- Header -->
-  <div class="text-center mb-8 no-print">
+  <div class="text-center mb-8">
     <div class="inline-flex items-center gap-3 mb-3">
       <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center shadow-lg">
         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,10 +98,8 @@ tailwind.config = {
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     
-    <!-- LEFT: Form -->
-    <div class="space-y-5 no-print">
+    <div class="space-y-5">
       
-      <!-- Datos generales -->
       <div class="glass rounded-2xl p-6 shadow-lg">
         <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <span class="w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold">1</span>
@@ -169,7 +117,6 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- Transferencias -->
       <div class="glass rounded-2xl p-6 shadow-lg">
         <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">2</span>
@@ -186,7 +133,6 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- Paquetes entregados -->
       <div class="glass rounded-2xl p-6 shadow-lg">
         <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <span class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">3</span>
@@ -201,7 +147,6 @@ tailwind.config = {
         <div id="totalPaquetes" class="text-right font-bold text-emerald-700 text-sm pt-2 border-t border-gray-200"></div>
       </div>
 
-      <!-- Paquetes rechazados -->
       <div class="glass rounded-2xl p-6 shadow-lg">
         <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <span class="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center text-sm font-bold">4</span>
@@ -217,7 +162,6 @@ tailwind.config = {
         <div id="totalRechazados" class="text-right font-bold text-red-700 text-sm pt-2 border-t border-gray-200"></div>
       </div>
 
-      <!-- Resumen -->
       <div class="glass rounded-2xl p-6 shadow-lg border-2 border-brand-200">
         <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <span class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center text-sm font-bold">$</span>
@@ -239,15 +183,10 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- Acciones -->
       <div class="flex flex-wrap gap-3">
-        <button onclick="descargarPDF()" class="flex-1 btn-success text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-          Descargar PDF
-        </button>
-        <button onclick="descargarPDFhtml2pdf()" class="flex-1 btn-primary text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
-          PDF (Alternativo)
+        <button id="btnPDF" onclick="generarPDF()" class="flex-1 btn-success text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 min-h-[52px]">
+          <svg id="iconPDF" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span id="txtPDF">Descargar PDF</span>
         </button>
         <button onclick="limpiarTodo()" class="btn-danger text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
@@ -255,50 +194,47 @@ tailwind.config = {
         </button>
       </div>
       
-      <!-- Ayuda -->
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm">
         <div class="font-bold text-blue-900 mb-1 flex items-center gap-2">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          ¿Problemas para descargar?
+          Información
         </div>
-        <p class="text-blue-800 text-xs">Si el botón no funciona, use <strong>"PDF (Alternativo)"</strong> o en el diálogo de impresión seleccione <strong>"Guardar como PDF"</strong> como destino.</p>
+        <p class="text-blue-800 text-xs">El PDF se generará y descargará automáticamente. En iOS Safari, revise la carpeta de <strong>Descargas</strong> o el botón de compartir.</p>
       </div>
     </div>
 
-    <!-- RIGHT: Receipt Preview -->
     <div class="lg:sticky lg:top-6 lg:self-start">
-      <div class="glass rounded-2xl p-4 shadow-lg no-print-header">
-        <div class="flex items-center justify-between mb-3 px-2 no-print">
+      <div class="glass rounded-2xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-3 px-2">
           <h2 class="text-lg font-bold text-gray-800">Vista Previa del Recibo</h2>
           <span class="text-xs bg-brand-100 text-brand-700 px-3 py-1 rounded-full font-semibold">Actualización en vivo</span>
         </div>
-        <div id="receipt-output" class="receipt rounded-xl overflow-hidden shadow-md">
-        </div>
+        <div id="receipt-output" class="receipt rounded-xl overflow-hidden shadow-md"></div>
       </div>
     </div>
 
   </div>
 </div>
 
+<!-- Hidden container for PDF rendering -->
+<div id="pdf-container"></div>
+
 <script>
-// State
 let transferencias = [];
 let paquetes = [];
 let rechazados = [];
 
-// Init date
 document.getElementById('fechaCuadre').valueAsDate = new Date();
 
-// Toast
 function showToast(message, type = 'success') {
   const existing = document.querySelectorAll('.toast');
   existing.forEach(t => t.remove());
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   const icons = {
-    success: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
-    error: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
-    info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+    success: '<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+    error: '<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+    info: '<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
   };
   toast.innerHTML = (icons[type] || icons.info) + `<span>${message}</span>`;
   document.body.appendChild(toast);
@@ -309,19 +245,16 @@ function showToast(message, type = 'success') {
   }, 4000);
 }
 
-// Format currency
 function fmt(n) {
   return 'RD$ ' + Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Format date
 function fmtDate(d) {
   if (!d) return '';
   const date = new Date(d + 'T00:00:00');
   return date.toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-// Add functions
 function addTransferencia() {
   const desc = document.getElementById('tDesc').value.trim();
   const monto = parseFloat(document.getElementById('tMonto').value);
@@ -363,7 +296,6 @@ function limpiarTodo() {
   renderAll();
 }
 
-// Render
 function renderAll() {
   const precioPaq = parseFloat(document.getElementById('paqPrecio').value) || 150;
   
@@ -450,117 +382,117 @@ function renderReceipt() {
   const saldo = inicial - egresos;
 
   let html = `
-    <div style="background:#1d4ed8;color:white;padding:20px 24px;">
+    <div style="background:#1d4ed8;color:white;padding:16px 20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;opacity:0.8;">Reporte Oficial</div>
-          <div style="font-size:20px;font-weight:bold;margin-top:4px;">Cuadre de Caja y Transferencias</div>
-          <div style="font-size:12px;opacity:0.9;margin-top:4px;">Conciliación Bancaria</div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.8;">Reporte Oficial</div>
+          <div style="font-size:18px;font-weight:bold;margin-top:2px;">Cuadre de Caja y Transferencias</div>
+          <div style="font-size:11px;opacity:0.9;margin-top:2px;">Conciliación Bancaria</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:11px;opacity:0.8;">Fecha de Cuadre</div>
-          <div style="font-size:14px;font-weight:600;margin-top:4px;">${fmtDate(fecha) || '—'}</div>
+          <div style="font-size:10px;opacity:0.8;">Fecha de Cuadre</div>
+          <div style="font-size:13px;font-weight:600;margin-top:2px;">${fmtDate(fecha) || '—'}</div>
         </div>
       </div>
     </div>
 
-    <div style="padding:24px;">
+    <div style="padding:16px 20px;">
   `;
 
   // 1. Transferencias
   html += `
-    <div style="margin-bottom:20px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <div style="width:24px;height:24px;border-radius:6px;background:#f59e0b;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">1</div>
-        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Detalle de Transferencias</h3>
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <div style="width:22px;height:22px;border-radius:5px;background:#f59e0b;color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;">1</div>
+        <h3 style="font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Detalle de Transferencias</h3>
       </div>
-      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Concepto</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Monto (RD$)</th></tr></thead>
+      <div style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Concepto</th><th style="text-align:right;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Monto (RD$)</th></tr></thead>
           <tbody>
   `;
   if (transferencias.length === 0) {
-    html += `<tr><td colspan="2" style="text-align:center;color:#9ca3af;font-style:italic;padding:12px;">Sin transferencias</td></tr>`;
+    html += `<tr><td colspan="2" style="text-align:center;color:#9ca3af;font-style:italic;padding:10px;">Sin transferencias</td></tr>`;
   } else {
     transferencias.forEach(t => {
-      html += `<tr><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">${t.desc}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(t.monto)}</td></tr>`;
+      html += `<tr><td style="padding:8px 10px;border-top:1px solid #e5e7eb;">${t.desc}</td><td style="padding:8px 10px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(t.monto)}</td></tr>`;
     });
-    html += `<tr style="background:#dbeafe;font-weight:700;"><td style="padding:10px 14px;">TOTAL</td><td style="padding:10px 14px;text-align:right;">${fmt(totalT)}</td></tr>`;
+    html += `<tr style="background:#dbeafe;font-weight:700;"><td style="padding:8px 10px;">TOTAL</td><td style="padding:8px 10px;text-align:right;">${fmt(totalT)}</td></tr>`;
   }
   html += `</tbody></table></div></div>`;
 
   // 2. Paquetes
   html += `
-    <div style="margin-bottom:20px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <div style="width:24px;height:24px;border-radius:6px;background:#059669;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">2</div>
-        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Paquetes Entregados</h3>
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <div style="width:22px;height:22px;border-radius:5px;background:#059669;color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;">2</div>
+        <h3 style="font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Paquetes Entregados</h3>
       </div>
-      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Concepto</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Cantidad</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Valor Total (RD$)</th></tr></thead>
+      <div style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Concepto</th><th style="text-align:right;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Cantidad</th><th style="text-align:right;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Valor Total (RD$)</th></tr></thead>
           <tbody>
   `;
   if (paquetes.length === 0) {
-    html += `<tr><td colspan="3" style="text-align:center;color:#9ca3af;font-style:italic;padding:12px;">Sin paquetes</td></tr>`;
+    html += `<tr><td colspan="3" style="text-align:center;color:#9ca3af;font-style:italic;padding:10px;">Sin paquetes</td></tr>`;
   } else {
     paquetes.forEach(p => {
-      html += `<tr><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">Paquetes entregados @ ${fmt(p.precio)} c/u</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;">${p.cantidad}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(p.total)}</td></tr>`;
+      html += `<tr><td style="padding:8px 10px;border-top:1px solid #e5e7eb;">Paquetes entregados @ ${fmt(p.precio)} c/u</td><td style="padding:8px 10px;border-top:1px solid #e5e7eb;text-align:right;">${p.cantidad}</td><td style="padding:8px 10px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(p.total)}</td></tr>`;
     });
-    html += `<tr style="background:#dbeafe;font-weight:700;"><td colspan="2" style="padding:10px 14px;">TOTAL (${totalCant} paquetes)</td><td style="padding:10px 14px;text-align:right;">${fmt(totalP)}</td></tr>`;
+    html += `<tr style="background:#dbeafe;font-weight:700;"><td colspan="2" style="padding:8px 10px;">TOTAL (${totalCant} paquetes)</td><td style="padding:8px 10px;text-align:right;">${fmt(totalP)}</td></tr>`;
   }
   html += `</tbody></table></div></div>`;
 
   // 3. Rechazados
   html += `
-    <div style="margin-bottom:20px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <div style="width:24px;height:24px;border-radius:6px;background:#ef4444;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">3</div>
-        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Paquetes Rechazados</h3>
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <div style="width:22px;height:22px;border-radius:5px;background:#ef4444;color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;">3</div>
+        <h3 style="font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Paquetes Rechazados</h3>
       </div>
-      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Beneficiario</th><th style="text-align:left;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Código</th><th style="text-align:right;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Valor (RD$)</th><th style="text-align:center;padding:10px 14px;font-size:11px;text-transform:uppercase;color:#475569;">Estatus</th></tr></thead>
+      <div style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Beneficiario</th><th style="text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Código</th><th style="text-align:right;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Valor (RD$)</th><th style="text-align:center;padding:8px 10px;font-size:10px;text-transform:uppercase;color:#475569;">Estatus</th></tr></thead>
           <tbody>
   `;
   if (rechazados.length === 0) {
-    html += `<tr><td colspan="4" style="text-align:center;color:#9ca3af;font-style:italic;padding:12px;">Sin paquetes rechazados</td></tr>`;
+    html += `<tr><td colspan="4" style="text-align:center;color:#9ca3af;font-style:italic;padding:10px;">Sin paquetes rechazados</td></tr>`;
   } else {
     rechazados.forEach(r => {
-      html += `<tr><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">${r.beneficiario}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;">${r.codigo}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(precioPaq)}</td><td style="padding:10px 14px;border-top:1px solid #e5e7eb;text-align:center;"><span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">Rechazado</span></td></tr>`;
+      html += `<tr><td style="padding:8px 10px;border-top:1px solid #e5e7eb;">${r.beneficiario}</td><td style="padding:8px 10px;border-top:1px solid #e5e7eb;">${r.codigo}</td><td style="padding:8px 10px;border-top:1px solid #e5e7eb;text-align:right;font-weight:600;">${fmt(precioPaq)}</td><td style="padding:8px 10px;border-top:1px solid #e5e7eb;text-align:center;"><span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:600;">Rechazado</span></td></tr>`;
     });
-    html += `<tr style="background:#dbeafe;font-weight:700;"><td colspan="2" style="padding:10px 14px;">TOTAL (${rechazados.length} rechazados × ${fmt(precioPaq)})</td><td colspan="2" style="padding:10px 14px;text-align:right;">${fmt(totalR)}</td></tr>`;
+    html += `<tr style="background:#dbeafe;font-weight:700;"><td colspan="2" style="padding:8px 10px;">TOTAL (${rechazados.length} rechazados × ${fmt(precioPaq)})</td><td colspan="2" style="padding:8px 10px;text-align:right;">${fmt(totalR)}</td></tr>`;
   }
   html += `</tbody></table></div></div>`;
 
   // 4. Resumen
   html += `
-    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-        <div style="width:24px;height:24px;border-radius:6px;background:#1d4ed8;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">4</div>
-        <h3 style="font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Resumen de Cálculos</h3>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+        <div style="width:22px;height:22px;border-radius:5px;background:#1d4ed8;color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;">4</div>
+        <h3 style="font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Resumen de Cálculos</h3>
       </div>
-      <div style="font-size:13px;">
-        <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:#6b7280;">Total Inicial</span><span style="font-weight:600;">${fmt(inicial)}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;color:#b45309;"><span>(-) Transferencias Realizadas</span><span style="font-weight:600;">${fmt(totalT)}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;color:#047857;"><span>(-) Paquetes Entregados (${totalCant} × ${fmt(precioPaq)})</span><span style="font-weight:600;">${fmt(totalP)}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;color:#b91c1c;"><span>(-) Paquetes Rechazados (${rechazados.length} × ${fmt(precioPaq)})</span><span style="font-weight:600;">${fmt(totalR)}</span></div>
-        <div style="border-top:2px solid #d1d5db;padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;font-weight:bold;">
+      <div style="font-size:12px;">
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:#6b7280;">Total Inicial</span><span style="font-weight:600;">${fmt(inicial)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#b45309;"><span>(-) Transferencias Realizadas</span><span style="font-weight:600;">${fmt(totalT)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#047857;"><span>(-) Paquetes Entregados (${totalCant} × ${fmt(precioPaq)})</span><span style="font-weight:600;">${fmt(totalP)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#b91c1c;"><span>(-) Paquetes Rechazados (${rechazados.length} × ${fmt(precioPaq)})</span><span style="font-weight:600;">${fmt(totalR)}</span></div>
+        <div style="border-top:2px solid #d1d5db;padding-top:6px;margin-top:6px;display:flex;justify-content:space-between;font-weight:bold;">
           <span>TOTAL DE EGRESOS</span><span>${fmt(egresos)}</span>
         </div>
       </div>
-      <div style="background:#059669;color:white;border-radius:12px;padding:20px;text-align:center;margin-top:16px;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;opacity:0.9;">Saldo Final</div>
-        <div style="font-size:30px;font-weight:bold;margin-top:4px;">${fmt(saldo)}</div>
+      <div style="background:#059669;color:white;border-radius:10px;padding:14px;text-align:center;margin-top:12px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.9;">Saldo Final</div>
+        <div style="font-size:26px;font-weight:bold;margin-top:2px;">${fmt(saldo)}</div>
       </div>
     </div>
   `;
 
   // Notas
   html += `
-    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:20px;">
-      <div style="font-weight:bold;color:#1e3a8a;font-size:13px;margin-bottom:8px;">NOTAS IMPORTANTES:</div>
-      <ul style="font-size:12px;color:#1e40af;list-style:none;padding:0;margin:0;">
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:14px;">
+      <div style="font-weight:bold;color:#1e3a8a;font-size:12px;margin-bottom:6px;">NOTAS IMPORTANTES:</div>
+      <ul style="font-size:11px;color:#1e40af;list-style:none;padding:0;margin:0;">
         <li style="padding:2px 0;">✓ Este cuadre ha sido conciliado y balanceado correctamente.</li>
         <li style="padding:2px 0;">✓ Se incluyen ${rechazados.length} paquete(s) rechazado(s) pagado(s) según acuerdo.</li>
         <li style="padding:2px 0;">✓ Todos los datos han sido verificados y confirmados.</li>
@@ -571,15 +503,15 @@ function renderReceipt() {
 
   // Firmas
   html += `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding-top:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding-top:12px;">
       <div style="text-align:center;">
-        <div style="border-top:1.5px solid #374151;margin-top:50px;padding-top:8px;font-size:12px;font-weight:600;color:#374151;">Contador</div>
+        <div style="border-top:1.5px solid #374151;margin-top:40px;padding-top:6px;font-size:11px;font-weight:600;color:#374151;">Contador</div>
       </div>
       <div style="text-align:center;">
-        <div style="border-top:1.5px solid #374151;margin-top:50px;padding-top:8px;font-size:12px;font-weight:600;color:#374151;">Gerente</div>
+        <div style="border-top:1.5px solid #374151;margin-top:40px;padding-top:6px;font-size:11px;font-weight:600;color:#374151;">Gerente</div>
       </div>
       <div style="text-align:center;">
-        <div style="border-top:1.5px solid #374151;margin-top:50px;padding-top:8px;font-size:12px;font-weight:600;color:#374151;">Director Financiero</div>
+        <div style="border-top:1.5px solid #374151;margin-top:40px;padding-top:6px;font-size:11px;font-weight:600;color:#374151;">Director Financiero</div>
       </div>
     </div>
   `;
@@ -589,68 +521,137 @@ function renderReceipt() {
 }
 
 // ============================================
-// MÉTODO 1: window.print() - MÁS CONFIABLE
+// GENERACIÓN DE PDF CON jsPDF + html2canvas
 // ============================================
-function descargarPDF() {
+async function generarPDF() {
   const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
   if (inicial === 0) {
     showToast('Ingrese el Total Inicial antes de generar el PDF', 'error');
     return;
   }
-  
-  showToast('Abriendo diálogo de impresión... Seleccione "Guardar como PDF"', 'info');
-  
-  setTimeout(() => {
-    window.print();
-  }, 500);
-}
 
-// ============================================
-// MÉTODO 2: html2pdf.js - ALTERNATIVO
-// ============================================
-async function descargarPDFhtml2pdf() {
-  const inicial = parseFloat(document.getElementById('totalInicial').value) || 0;
-  if (inicial === 0) {
-    showToast('Ingrese el Total Inicial antes de generar el PDF', 'error');
+  const btn = document.getElementById('btnPDF');
+  const txtPDF = document.getElementById('txtPDF');
+  const iconPDF = document.getElementById('iconPDF');
+
+  // Verificar librerías
+  if (typeof window.jspdf === 'undefined' || typeof window.html2canvas === 'undefined') {
+    showToast('Error: Librerías no cargadas. Recargue la página.', 'error');
     return;
   }
-  
-  // Verificar si html2pdf está disponible
-  if (typeof html2pdf === 'undefined') {
-    console.error('html2pdf no está disponible');
-    showToast('Librería PDF no cargada. Use "Descargar PDF" (método principal)', 'error');
-    return;
-  }
-  
-  const element = document.getElementById('receipt-output');
-  const fecha = document.getElementById('fechaCuadre').value || 'recibo';
-  
+
+  // Estado de carga
+  btn.disabled = true;
+  iconSVG = iconPDF.innerHTML;
+  iconPDF.innerHTML = '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>';
+  iconPDF.classList.add('spinner');
+  txtPDF.textContent = 'Generando...';
+
   try {
-    showToast('Generando PDF...', 'info');
+    const fecha = document.getElementById('fechaCuadre').value || 'recibo';
+    const container = document.getElementById('pdf-container');
+    const receiptHTML = document.getElementById('receipt-output').innerHTML;
     
-    const opt = {
-      margin: 0,
-      filename: `cuadre_${fecha}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 800
-      },
-      jsPDF: { 
-        unit: 'mm', 
-        format: 'a4', 
-        orientation: 'portrait' 
+    // Renderizar en contenedor oculto con ancho fijo
+    container.innerHTML = `<div style="width:800px;background:white;">${receiptHTML}</div>`;
+    const renderTarget = container.firstElementChild;
+    
+    // Esperar un momento para que el DOM se actualice
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Capturar como canvas
+    const canvas = await html2canvas(renderTarget, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: 800,
+      windowWidth: 800
+    });
+    
+    // Limpiar contenedor
+    container.innerHTML = '';
+    
+    // Crear PDF con jsPDF
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    
+    // Calcular proporciones
+    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+    const imgX = (pdfWidth - imgWidth * ratio) / 2;
+    const imgY = 10;
+    const finalWidth = imgWidth * ratio;
+    const finalHeight = imgHeight * ratio;
+    
+    // Si el contenido es más alto que una página, agregar páginas
+    if (finalHeight > pdfHeight - 20) {
+      let heightLeft = finalHeight;
+      let position = 0;
+      let page = 0;
+      
+      while (heightLeft > 0) {
+        if (page > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', imgX, imgY - position, finalWidth, finalHeight);
+        heightLeft -= (pdfHeight - 20);
+        position += (pdfHeight - 20);
+        page++;
       }
-    };
+    } else {
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, finalWidth, finalHeight);
+    }
     
-    await html2pdf().set(opt).from(element).save();
-    showToast('PDF descargado correctamente', 'success');
+    // Generar blob y descargar
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    
+    // Detectar iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    
+    if (isIOS) {
+      // En iOS, abrir en nueva pestaña (el usuario puede compartir/guardar)
+      const newWindow = window.open(pdfUrl, '_blank');
+      if (!newWindow) {
+        // Si el popup fue bloqueado, usar enlace
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = `cuadre_${fecha}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      showToast('PDF generado. Guárdelo desde la vista previa.', 'success');
+    } else {
+      // En desktop/Android, descargar directamente
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = `cuadre_${fecha}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+      showToast('PDF descargado correctamente', 'success');
+    }
+    
   } catch (error) {
-    console.error('Error html2pdf:', error);
-    showToast('Error con método alternativo. Use "Descargar PDF" principal', 'error');
+    console.error('Error generando PDF:', error);
+    showToast('Error: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+    iconPDF.classList.remove('spinner');
+    iconPDF.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>';
+    txtPDF.textContent = 'Descargar PDF';
   }
 }
 
@@ -663,17 +664,13 @@ document.getElementById('tMonto').addEventListener('keypress', e => { if (e.key=
 document.getElementById('paqCantidad').addEventListener('keypress', e => { if (e.key==='Enter') addPaquete(); });
 document.getElementById('rCodigo').addEventListener('keypress', e => { if (e.key==='Enter') addRechazado(); });
 
-// Initial render
 renderAll();
 
-// Check library load
+// Verificar librerías
 window.addEventListener('load', () => {
   setTimeout(() => {
-    if (typeof html2pdf !== 'undefined') {
-      console.log('✓ html2pdf cargado correctamente');
-    } else {
-      console.warn('⚠ html2pdf no se cargó - use el botón principal "Descargar PDF"');
-    }
+    console.log('jsPDF:', typeof window.jspdf !== 'undefined' ? '✓' : '✗');
+    console.log('html2canvas:', typeof window.html2canvas !== 'undefined' ? '✓' : '✗');
   }, 1500);
 });
 </script>
